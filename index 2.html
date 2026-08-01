@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Call-Ahead</title>
+<style>
+  :root {
+    --bg: #0c1016;
+    --panel: #161d27;
+    --border: #2c3a4a;
+    --text: #f2f5f8;
+    --sub: #8fa1b3;
+    --ems-blue: #2f5fd1;
+    --ems-blue-dim: #16234a;
+    --poison: #7a2fd1;
+    --poison-dim: #26164a;
+    --safety: #ffd100;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body {
+    margin: 0; padding: 0; min-height: 100%;
+    background: radial-gradient(circle at 50% 0%, #131a24 0%, var(--bg) 60%);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    overscroll-behavior: none;
+    user-select: none;
+  }
+  header {
+    padding: 20px 20px 14px;
+    border-bottom: 2px solid var(--ems-blue);
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    background: linear-gradient(180deg, rgba(47,95,209,0.10), transparent);
+  }
+  .star { flex-shrink: 0; width: 34px; height: 34px; }
+  header .titles h1 {
+    margin: 0;
+    font-size: 20px;
+    letter-spacing: 0.04em;
+    font-weight: 800;
+    text-transform: uppercase;
+  }
+  header .titles p {
+    margin: 3px 0 0;
+    color: var(--sub);
+    font-size: 12.5px;
+    letter-spacing: 0.02em;
+  }
+  .section-label {
+    padding: 18px 18px 6px;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--sub);
+  }
+  #grid, #grid-poison {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 12px;
+    padding: 6px 16px 4px;
+  }
+  a.card {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 5px;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-left: 5px solid var(--ems-blue);
+    border-radius: 12px;
+    padding: 20px 18px;
+    text-decoration: none;
+    color: var(--text);
+    min-height: 92px;
+    transition: transform 0.08s ease, background 0.15s ease, border-color 0.15s ease;
+  }
+  a.card:active {
+    transform: scale(0.97);
+    background: var(--ems-blue-dim);
+    border-color: var(--safety);
+  }
+  a.card.poison { border-left-color: var(--poison); }
+  a.card.poison:active { background: var(--poison-dim); border-color: var(--safety); }
+  .card .name { font-size: 22px; font-weight: 700; line-height: 1.15; }
+  .card .sub {
+    font-size: 13px;
+    color: var(--sub);
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+  }
+  .card .num {
+    font-size: 16px;
+    color: var(--safety);
+    font-variant-numeric: tabular-nums;
+    font-weight: 600;
+    margin-top: 3px;
+    letter-spacing: 0.02em;
+  }
+  footer {
+    text-align: center;
+    color: var(--sub);
+    font-size: 11.5px;
+    padding: 22px 16px 26px;
+    letter-spacing: 0.02em;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <svg class="star" viewBox="0 0 100 100" fill="none">
+    <g stroke="#2f5fd1" stroke-width="8" stroke-linejoin="round">
+      <path d="M50 8 L58 38 L50 50 L42 38 Z" fill="#2f5fd1"/>
+      <path d="M92 50 L62 58 L50 50 L62 42 Z" fill="#2f5fd1"/>
+      <path d="M50 92 L42 62 L50 50 L58 62 Z" fill="#2f5fd1"/>
+      <path d="M8 50 L38 42 L50 50 L38 58 Z" fill="#2f5fd1"/>
+    </g>
+    <circle cx="50" cy="50" r="7" fill="#ffd100"/>
+  </svg>
+  <div class="titles">
+    <h1>Call-Ahead</h1>
+    <p>Tap to dial &middot; confirm number before connecting</p>
+  </div>
+</header>
+
+<div class="section-label">Receiving Hospitals</div>
+<div id="grid"></div>
+
+<div class="section-label">Poison Control</div>
+<div id="grid-poison"></div>
+
+<div class="section-label">Test Line</div>
+<div id="grid-test"></div>
+
+<footer>EMS Call-Ahead Tool &middot; edit HOSPITALS / POISON in index.html to update</footer>
+
+<script>
+  // ---- EDIT THESE LISTS ----
+  const HOSPITALS = [
+    { name: "Morristown Medical Center", sub: "ER", phone: "973-971-5918" },
+    { name: "Cooperman Barnabas", sub: "ER", phone: "973-322-5181" },
+  ];
+
+  const POISON = [
+    { name: "Poison Control", sub: "24/7 National Line", phone: "800-222-1222" },
+  ];
+
+  const TEST = [
+    { name: "Test Call", sub: "Automated line — safe to tap", phone: "212-736-3100" },
+  ];
+  // ---------------------------
+
+  function renderCards(list, containerId, extraClass) {
+    const grid = document.getElementById(containerId);
+    list.forEach(h => {
+      const telHref = 'tel:' + h.phone.replace(/[^\d+]/g, '');
+      const a = document.createElement('a');
+      a.className = 'card' + (extraClass ? ' ' + extraClass : '');
+      a.href = telHref;
+      a.innerHTML = `
+        <div class="name">${h.name}</div>
+        ${h.sub ? `<div class="sub">${h.sub}</div>` : ''}
+        <div class="num">${h.phone}</div>
+      `;
+      // Fallback trigger in case the anchor's href is blocked by a webview/sandbox
+      a.addEventListener('click', (e) => {
+        e.preventDefault();
+        window.location.href = telHref;
+      });
+      grid.appendChild(a);
+    });
+  }
+
+  renderCards(HOSPITALS, 'grid');
+  renderCards(POISON, 'grid-poison', 'poison');
+  renderCards(TEST, 'grid-test', 'poison');
+</script>
+
+</body>
+</html>
