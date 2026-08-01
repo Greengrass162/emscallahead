@@ -133,10 +133,7 @@
 <div class="section-label">Poison Control</div>
 <div id="grid-poison"></div>
 
-<div class="section-label">Test Line</div>
-<div id="grid-test"></div>
 
-<footer>EMS Call-Ahead Tool &middot; edit HOSPITALS / POISON in index.html to update</footer>
 
 <script>
   // ---- EDIT THESE LISTS ----
@@ -147,10 +144,6 @@
 
   const POISON = [
     { name: "Poison Control", sub: "24/7 National Line", phone: "800-222-1222" },
-  ];
-
-  const TEST = [
-    { name: "Test Call", sub: "Automated line — safe to tap", phone: "212-736-3100" },
   ];
   // ---------------------------
 
@@ -177,7 +170,6 @@
 
   renderCards(HOSPITALS, 'grid');
   renderCards(POISON, 'grid-poison', 'poison');
-  renderCards(TEST, 'grid-test', 'poison');
 </script>
 
 </body>
