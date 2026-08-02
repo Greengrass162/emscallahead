@@ -452,37 +452,54 @@
   }
 
   // ---- barcode parsing (AAMVA field codes) ----
-  function parseBarcode(rawData) {
-    rawData = rawData.replace(/\r/g, '\n');
-    const lines = rawData.split('\n');
-    const fields = {};
-    lines.forEach(line => {
-      line = line.trim();
-      if (/^D[A-Z]{2}/.test(line)) {
-        const code = line.substr(0, 3);
-        const value = line.substr(3).trim();
-        if (!(code in fields)) fields[code] = value;
-      }
-    });
+  // Some 2D scanners strip the internal field separators from AAMVA data,
+  // leaving every field jammed together (e.g. "...DCSGREENGRASSDDENDACALEXANDER...").
+  // Rather than relying on separators, we scan the raw text for the known
+  // 3-letter field codes wherever they occur and slice values between them.
+  // This works whether or not separators survive the scan.
+  const AAMVA_CODES = ['DAQ','DCS','DDE','DAC','DDF','DAD','DDG','DCA','DCB','DCD','DBD','DBB',
+    'DBA','DBC','DAU','DAY','DAG','DAH','DAI','DAJ','DAK','DCF','DCG','DCK','DDA','DDB',
+    'DCU','DCE','DAZ','DAW'];
+  const AAMVA_CODE_SET = new Set(AAMVA_CODES);
 
-    const firstName = fields['DAC'] || '';
-    const lastName = fields['DCS'] || '';
-    const dobRaw = fields['DBB'] || '';
-    const sexCode = fields['DBC'] || '';
-    const street = fields['DAG'] || '';
-    const city = fields['DAI'] || '';
-    const state = (fields['DAJ'] || '').toUpperCase();
-    const zipRaw = fields['DAK'] || '';
+  function tokenizeAamva(text) {
+    const matches = [];
+    for (let i = 0; i <= text.length - 3; i++) {
+      const chunk = text.substr(i, 3);
+      if (AAMVA_CODE_SET.has(chunk)) matches.push({ code: chunk, index: i });
+    }
+    const fields = {};
+    for (let m = 0; m < matches.length; m++) {
+      const valueStart = matches[m].index + 3;
+      const valueEnd = (m + 1 < matches.length) ? matches[m + 1].index : text.length;
+      const value = text.substring(valueStart, valueEnd).trim();
+      if (!(matches[m].code in fields)) fields[matches[m].code] = value;
+    }
+    return fields;
+  }
+
+  function parseBarcode(rawData) {
+    const cleaned = rawData.replace(/[\r\n]+/g, '');
+    const fields = tokenizeAamva(cleaned);
+
+    const firstName = (fields['DAC'] || '').trim();
+    const lastName = (fields['DCS'] || '').trim();
+    const dobDigits = (fields['DBB'] || '').replace(/\D/g, '').substr(0, 8);
+    const sexCode = (fields['DBC'] || '').trim().charAt(0);
+    const street = (fields['DAG'] || '').trim();
+    const city = (fields['DAI'] || '').trim();
+    const state = (fields['DAJ'] || '').trim().substr(0, 2).toUpperCase();
+    const zipDigits = (fields['DAK'] || '').replace(/\D/g, '');
 
     let dob = '', dobDate = null;
-    if (dobRaw.length >= 8) {
-      const mm = dobRaw.substr(0, 2), dd = dobRaw.substr(2, 2), yyyy = dobRaw.substr(4, 4);
+    if (dobDigits.length === 8) {
+      const mm = dobDigits.substr(0, 2), dd = dobDigits.substr(2, 2), yyyy = dobDigits.substr(4, 4);
       dobDate = new Date(`${yyyy}-${mm}-${dd}`);
       if (!isNaN(dobDate.getTime())) dob = `${mm}/${dd}/${yyyy}`;
     }
 
-    let zip = zipRaw;
-    if (zipRaw.length === 9) zip = zipRaw.substr(0, 5) + '-' + zipRaw.substr(5, 4);
+    let zip = zipDigits;
+    if (zipDigits.length === 9) zip = zipDigits.substr(0, 5) + '-' + zipDigits.substr(5, 4);
 
     return {
       firstName, lastName, dob, dobDate,
@@ -531,7 +548,7 @@
   const captureField = document.getElementById('captureField');
   const scanFlag = document.getElementById('scanFlag');
   const MIN_SCAN_LENGTH = 25;
-  const IDLE_MS = 250;
+  const IDLE_MS = 500;
   let idleTimer = null;
 
   function focusCapture() {
@@ -548,14 +565,22 @@
 
   function processBuffer() {
     const raw = captureField.value;
-    captureField.value = '';
-    captureField.classList.remove('active');
-    if (raw.trim().length < MIN_SCAN_LENGTH) return; // too short to be a real scan, ignore
+
+    // Too short to possibly be a full scan yet — a scanner mid-transmission can
+    // have brief pauses between chunks. Don't wipe partial data; just keep
+    // listening so the rest of the scan can still land in the same field.
+    if (raw.trim().length < MIN_SCAN_LENGTH) return;
 
     const parsed = parseBarcode(raw);
     if (validateScan(parsed)) {
+      captureField.value = '';
+      captureField.classList.remove('active');
       finalizeAndSave(parsed);
     } else {
+      // Long enough to judge, but didn't parse into a valid record — treat as
+      // a genuinely bad/garbled scan and clear it so the next attempt starts clean.
+      captureField.value = '';
+      captureField.classList.remove('active');
       flagBadScan();
       focusCapture();
     }
@@ -567,11 +592,12 @@
     idleTimer = setTimeout(processBuffer, IDLE_MS);
   });
 
-  // A trailing Enter from the scanner shouldn't insert a newline or submit
-  // anything by itself — just let the idle-timeout above handle finishing.
-  captureField.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') e.preventDefault();
-  });
+  // Note: we deliberately do NOT intercept the Enter key here. AAMVA barcode
+  // data uses line-feed characters as separators *between individual fields*
+  // (not just once at the end), and scanners typically transmit those as
+  // Enter keystrokes. Letting Enter behave normally in the textarea (i.e.
+  // insert a line break) preserves that field structure for parseBarcode().
+  // End-of-scan is still detected purely by the idle-timeout below.
 
   // Keep the capture field focused so scanner input always lands there
   document.addEventListener('click', () => { if (scanView.style.display !== 'none') focusCapture(); });
