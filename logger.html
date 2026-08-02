@@ -1,0 +1,400 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>EMS Time Logger</title>
+<style>
+  :root {
+    --bg: #0c1016;
+    --panel: #161d27;
+    --panel-logged: #16234a;
+    --border: #2c3a4a;
+    --text: #f2f5f8;
+    --sub: #8fa1b3;
+    --ems-blue: #2f5fd1;
+    --safety: #ffd100;
+    --danger: #ff3b30;
+    --danger-dim: #3a1512;
+    --available: #21c07a;
+    --available-dim: #10331f;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body {
+    margin: 0; padding: 0; min-height: 100%;
+    background: radial-gradient(circle at 50% 0%, #131a24 0%, var(--bg) 60%);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    overscroll-behavior: none;
+    user-select: none;
+  }
+  header {
+    padding: 20px 20px 14px;
+    border-bottom: 2px solid var(--ems-blue);
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    background: linear-gradient(180deg, rgba(47,95,209,0.10), transparent);
+  }
+  .star { flex-shrink: 0; width: 34px; height: 34px; }
+  header .titles h1 {
+    margin: 0;
+    font-size: 20px;
+    letter-spacing: 0.04em;
+    font-weight: 800;
+    text-transform: uppercase;
+  }
+  header .titles p {
+    margin: 3px 0 0;
+    color: var(--sub);
+    font-size: 12.5px;
+    letter-spacing: 0.02em;
+  }
+  .section-label {
+    padding: 18px 18px 6px;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--sub);
+  }
+  #grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 12px;
+    padding: 6px 16px 4px;
+  }
+  button.card {
+    all: unset;
+    box-sizing: border-box;
+    cursor: pointer;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 5px;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-left: 5px solid var(--ems-blue);
+    border-radius: 12px;
+    padding: 20px 18px;
+    min-height: 92px;
+    transition: transform 0.08s ease, background 0.15s ease, border-color 0.15s ease;
+  }
+  button.card:active { transform: scale(0.97); }
+  button.card.logged {
+    background: var(--panel-logged);
+    border-color: var(--safety);
+  }
+  button.card .step {
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--sub);
+    letter-spacing: 0.08em;
+  }
+  button.card .name { font-size: 21px; font-weight: 700; line-height: 1.2; }
+  button.card .time {
+    font-size: 22px;
+    color: var(--safety);
+    font-variant-numeric: tabular-nums;
+    font-weight: 700;
+    margin-top: 2px;
+    letter-spacing: 0.02em;
+  }
+  button.card .placeholder {
+    font-size: 13px;
+    color: var(--sub);
+    margin-top: 2px;
+  }
+
+  #available-wrap { padding: 4px 16px 4px; }
+  button.available {
+    all: unset;
+    box-sizing: border-box;
+    cursor: pointer;
+    display: flex;
+    width: 100%;
+    align-items: center;
+    justify-content: space-between;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-left: 5px solid var(--available);
+    border-radius: 12px;
+    padding: 18px 20px;
+    transition: transform 0.08s ease, background 0.15s ease, border-color 0.15s ease;
+  }
+  button.available:active { transform: scale(0.98); }
+  button.available.logged {
+    background: var(--available-dim);
+    border-color: var(--available);
+  }
+  button.available .name { font-size: 20px; font-weight: 700; }
+  button.available .time {
+    font-size: 20px;
+    color: var(--safety);
+    font-variant-numeric: tabular-nums;
+    font-weight: 700;
+  }
+  button.available .placeholder { font-size: 13px; color: var(--sub); }
+
+  #clear-wrap {
+    display: flex;
+    justify-content: center;
+    padding: 26px 16px 30px;
+  }
+  button.clear-btn {
+    all: unset;
+    cursor: pointer;
+    color: var(--danger);
+    border: 1px solid var(--danger);
+    border-radius: 10px;
+    padding: 12px 22px;
+    font-size: 14px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    transition: background 0.15s ease;
+  }
+  button.clear-btn:active { background: var(--danger-dim); }
+
+  #modal-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(4, 6, 10, 0.72);
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+    z-index: 50;
+  }
+  #modal-overlay.show { display: flex; }
+  #modal-box {
+    width: 100%;
+    max-width: 380px;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-top: 4px solid var(--safety);
+    border-radius: 16px;
+    padding: 24px 22px 20px;
+  }
+  #modal-box.danger { border-top-color: var(--danger); }
+  #modal-title {
+    font-size: 17px;
+    font-weight: 800;
+    margin: 0 0 8px;
+  }
+  #modal-message {
+    font-size: 14px;
+    color: var(--sub);
+    line-height: 1.5;
+    margin: 0 0 20px;
+    white-space: pre-line;
+  }
+  #modal-actions {
+    display: flex;
+    gap: 10px;
+  }
+  #modal-actions button {
+    all: unset;
+    box-sizing: border-box;
+    flex: 1;
+    text-align: center;
+    cursor: pointer;
+    padding: 13px 10px;
+    border-radius: 10px;
+    font-size: 14px;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+  }
+  #modal-cancel {
+    border: 1px solid var(--border);
+    color: var(--text);
+  }
+  #modal-cancel:active { background: var(--panel-logged); }
+  #modal-confirm {
+    background: var(--safety);
+    color: #1a1400;
+  }
+  #modal-confirm:active { background: #e6bc00; }
+  #modal-box.danger #modal-confirm {
+    background: var(--danger);
+    color: #fff;
+  }
+  #modal-box.danger #modal-confirm:active { background: #cc2f26; }
+</style>
+</head>
+<body>
+
+<header>
+  <svg class="star" viewBox="0 0 100 100" fill="none">
+    <g stroke="#2f5fd1" stroke-width="8" stroke-linejoin="round">
+      <path d="M50 8 L58 38 L50 50 L42 38 Z" fill="#2f5fd1"/>
+      <path d="M92 50 L62 58 L50 50 L62 42 Z" fill="#2f5fd1"/>
+      <path d="M50 92 L42 62 L50 50 L58 62 Z" fill="#2f5fd1"/>
+      <path d="M8 50 L38 42 L50 50 L38 58 Z" fill="#2f5fd1"/>
+    </g>
+    <circle cx="50" cy="50" r="7" fill="#ffd100"/>
+  </svg>
+  <div class="titles">
+    <h1>Time Logger</h1>
+    <p>Tap a step to log the time &middot; tap again to update it</p>
+  </div>
+</header>
+
+<div class="section-label">Incident Timeline</div>
+<div id="grid"></div>
+
+<div id="available-wrap"></div>
+
+<div id="clear-wrap">
+  <button class="clear-btn" id="clear-btn">Clear All Times</button>
+</div>
+
+<div id="modal-overlay">
+  <div id="modal-box">
+    <p id="modal-title"></p>
+    <p id="modal-message"></p>
+    <div id="modal-actions">
+      <button id="modal-cancel">Cancel</button>
+      <button id="modal-confirm">Confirm</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  const STORAGE_KEY = 'emsTimeLog';
+
+  const STEPS = [
+    { key: 'responding',      name: 'Responding' },
+    { key: 'arrivedScene',    name: 'Arrived on Scene' },
+    { key: 'arrivedPatient',  name: 'Arrived at Patient' },
+    { key: 'alsArrival',      name: 'ALS Arrival' },
+    { key: 'transporting',    name: 'Transporting / Left the Scene' },
+    { key: 'arrivedDest',     name: 'Arrived at Destination' },
+    { key: 'transferredCare', name: 'Transferred Care' },
+    { key: 'departedDest',    name: 'Departed Destination' },
+  ];
+  const AVAILABLE = { key: 'available', name: 'Available' };
+
+  function loadLog() {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      return raw ? JSON.parse(raw) : {};
+    } catch (e) {
+      console.error('Could not read saved times', e);
+      return {};
+    }
+  }
+  function saveLog(log) {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(log));
+    } catch (e) {
+      console.error('Could not save time', e);
+      alert('Warning: this time may not have been saved. Check device storage.');
+    }
+  }
+
+  let log = loadLog();
+
+  function formatTime(iso) {
+    const d = new Date(iso);
+    return d.toLocaleTimeString([], { hour12: false, hour: '2-digit', minute: '2-digit' });
+  }
+
+  // ---- custom modal (replaces window.confirm, which some webviews block) ----
+  const overlay = document.getElementById('modal-overlay');
+  const modalBox = document.getElementById('modal-box');
+  const modalTitle = document.getElementById('modal-title');
+  const modalMessage = document.getElementById('modal-message');
+  const modalCancel = document.getElementById('modal-cancel');
+  const modalConfirm = document.getElementById('modal-confirm');
+  let pendingConfirm = null;
+
+  function askConfirm({ title, message, danger = false, onConfirm }) {
+    modalTitle.textContent = title;
+    modalMessage.textContent = message;
+    modalBox.classList.toggle('danger', danger);
+    pendingConfirm = onConfirm;
+    overlay.classList.add('show');
+  }
+  function closeModal() {
+    overlay.classList.remove('show');
+    pendingConfirm = null;
+  }
+  modalCancel.addEventListener('click', closeModal);
+  overlay.addEventListener('click', (e) => {
+    if (e.target === overlay) closeModal();
+  });
+  modalConfirm.addEventListener('click', () => {
+    const fn = pendingConfirm;
+    closeModal();
+    if (fn) fn();
+  });
+  // -----------------------------------------------------------------------
+
+  function handleTap(stepKey, stepName) {
+    const existing = log[stepKey];
+    if (existing) {
+      askConfirm({
+        title: 'Update this time?',
+        message: `${stepName} is already logged at ${formatTime(existing)}.\nUpdate it to the current time?`,
+        onConfirm: () => {
+          log[stepKey] = new Date().toISOString();
+          saveLog(log);
+          render();
+        }
+      });
+      return;
+    }
+    log[stepKey] = new Date().toISOString();
+    saveLog(log);
+    render();
+  }
+
+  function render() {
+    const grid = document.getElementById('grid');
+    grid.innerHTML = '';
+    STEPS.forEach((s, i) => {
+      const t = log[s.key];
+      const btn = document.createElement('button');
+      btn.className = 'card' + (t ? ' logged' : '');
+      btn.innerHTML = `
+        <div class="step">STEP ${i + 1}</div>
+        <div class="name">${s.name}</div>
+        ${t ? `<div class="time">${formatTime(t)}</div>` : `<div class="placeholder">Tap to log time</div>`}
+      `;
+      btn.addEventListener('click', () => handleTap(s.key, s.name));
+      grid.appendChild(btn);
+    });
+
+    const availWrap = document.getElementById('available-wrap');
+    const at = log[AVAILABLE.key];
+    availWrap.innerHTML = '';
+    const availBtn = document.createElement('button');
+    availBtn.className = 'available' + (at ? ' logged' : '');
+    availBtn.innerHTML = `
+      <span class="name">Available</span>
+      ${at ? `<span class="time">${formatTime(at)}</span>` : `<span class="placeholder">Tap to log time</span>`}
+    `;
+    availBtn.addEventListener('click', () => handleTap(AVAILABLE.key, AVAILABLE.name));
+    availWrap.appendChild(availBtn);
+  }
+
+  document.getElementById('clear-btn').addEventListener('click', () => {
+    askConfirm({
+      title: 'Clear all times?',
+      message: 'This clears every logged time for this call.\nThis cannot be undone.',
+      danger: true,
+      onConfirm: () => {
+        log = {};
+        saveLog(log);
+        render();
+      }
+    });
+  });
+
+  render();
+</script>
+
+</body>
+</html>
