@@ -1,0 +1,646 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+<meta name="mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="EMS ID Scan" />
+<title>EMS ID Scan</title>
+
+<style>
+  :root {
+    --bg: #0c1016;
+    --panel: #161d27;
+    --panel-2: #1c2530;
+    --border: #2c3a4a;
+    --text: #f2f5f8;
+    --sub: #8fa1b3;
+    --ems-blue: #2f5fd1;
+    --ems-blue-dim: #16234a;
+    --safety: #ffd100;
+    --danger: #ff3b30;
+    --danger-dim: #3a1512;
+    --available: #21c07a;
+    --available-dim: #10331f;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body {
+    margin: 0; padding: 0; min-height: 100%;
+    background: radial-gradient(circle at 50% 0%, #131a24 0%, var(--bg) 60%);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    overscroll-behavior: none;
+    user-select: none;
+  }
+
+  header {
+    padding: 20px 20px 14px;
+    padding-top: max(env(safe-area-inset-top, 16px), 20px);
+    border-bottom: 2px solid var(--ems-blue);
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    background: linear-gradient(180deg, rgba(47,95,209,0.10), transparent);
+  }
+  .star { flex-shrink: 0; width: 32px; height: 32px; }
+  header .titles h1 {
+    margin: 0;
+    font-size: 19px;
+    letter-spacing: 0.04em;
+    font-weight: 800;
+    text-transform: uppercase;
+  }
+  header .titles p {
+    margin: 3px 0 0;
+    color: var(--sub);
+    font-size: 12px;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+  }
+
+  /* ── SCAN (CAPTURE) VIEW ── */
+  #scan-view { padding: 16px 16px 40px; max-width: 480px; margin: 0 auto; }
+
+  .scanner-card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 28px 22px;
+    text-align: center;
+    margin-bottom: 16px;
+  }
+  .scanner-icon {
+    width: 56px; height: 56px; margin: 0 auto 14px;
+    display: flex; align-items: center; justify-content: center;
+    background: var(--ems-blue-dim); border-radius: 50%;
+  }
+  .scanner-icon svg { width: 28px; height: 28px; }
+  .scanner-card h2 { margin: 0 0 6px; font-size: 18px; font-weight: 800; }
+  .scanner-card p { margin: 0; color: var(--sub); font-size: 13.5px; line-height: 1.5; }
+
+  .capture-wrap { position: relative; margin-top: 18px; }
+  #captureField {
+    all: unset;
+    box-sizing: border-box;
+    width: 100%;
+    min-height: 64px;
+    background: var(--panel-2);
+    border: 1.5px dashed var(--border);
+    border-radius: 12px;
+    padding: 14px;
+    color: var(--sub);
+    font-size: 12px;
+    font-family: ui-monospace, Menlo, monospace;
+    word-break: break-all;
+    resize: none;
+    line-height: 1.5;
+  }
+  #captureField.active { border-color: var(--ems-blue); border-style: solid; }
+  .capture-status {
+    display: flex; align-items: center; justify-content: center; gap: 8px;
+    margin-top: 12px; font-size: 12.5px; font-weight: 600; color: var(--available);
+  }
+  .capture-dot {
+    width: 8px; height: 8px; border-radius: 50%; background: var(--available);
+    animation: pulse 1.4s ease-in-out infinite;
+  }
+  @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
+
+  .scan-flag {
+    display: none;
+    background: var(--danger-dim); border: 1px solid var(--danger); color: #ffb3ae;
+    font-size: 13px; font-weight: 600; padding: 10px 14px; border-radius: 10px;
+    margin-top: 12px; text-align: center;
+  }
+  .scan-flag.show { display: block; }
+
+  .pill-btn {
+    all: unset; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px;
+    width: 100%;
+    background: var(--panel-2); border: 1px solid var(--border); color: var(--text);
+    font-size: 14px; font-weight: 700; padding: 14px 18px; border-radius: 12px; margin-top: 8px;
+  }
+  .pill-btn svg { width: 16px; height: 16px; }
+  .pill-btn.manual { background: rgba(255,209,0,0.10); border-color: var(--safety); color: var(--safety); }
+  .pill-btn:active { opacity: 0.8; }
+
+  /* ── MANUAL VIEW ── */
+  #manual-view { display: none; padding: 16px 16px 40px; max-width: 480px; margin: 0 auto; }
+  .field-group { margin-bottom: 14px; }
+  .field-group label {
+    display: block; font-size: 12px; font-weight: 700; letter-spacing: 0.06em;
+    text-transform: uppercase; color: var(--sub); margin-bottom: 6px;
+  }
+  .field-group input, .field-group select {
+    all: unset; box-sizing: border-box; width: 100%; background: var(--panel);
+    border: 1px solid var(--border); border-radius: 10px; padding: 13px 14px;
+    color: var(--text); font-size: 16px;
+  }
+  .field-group input:focus, .field-group select:focus { border-color: var(--ems-blue); }
+  .field-row { display: flex; gap: 10px; }
+  .field-row .field-group { flex: 1; }
+
+  /* ── RESULT VIEW ── */
+  #result-view { display: none; padding: 16px 16px 40px; max-width: 480px; margin: 0 auto; }
+
+  .success-banner {
+    display: flex; align-items: center; gap: 10px; background: var(--available-dim);
+    border: 1px solid var(--available); border-radius: 12px; padding: 12px 16px; margin-bottom: 14px;
+  }
+  .success-icon {
+    width: 26px; height: 26px; background: var(--available); border-radius: 50%;
+    display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+  }
+  .success-icon svg { width: 13px; height: 13px; }
+  .success-banner p { margin: 0; font-size: 13px; font-weight: 600; color: var(--available); }
+
+  .info-card {
+    background: var(--panel); border: 1px solid var(--border); border-radius: 14px;
+    overflow: hidden; margin-bottom: 12px;
+  }
+  .card-title {
+    font-size: 11px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase;
+    color: var(--sub); padding: 12px 16px 10px; background: var(--panel-2);
+    border-bottom: 1px solid var(--border);
+  }
+  .info-row {
+    display: flex; align-items: flex-start; gap: 12px; padding: 12px 16px;
+    border-top: 1px solid var(--border);
+  }
+  .info-row:first-of-type { border-top: none; }
+  .row-label { font-size: 13px; color: var(--sub); font-weight: 500; width: 84px; flex-shrink: 0; padding-top: 2px; }
+  .row-value { font-size: 16px; font-weight: 600; color: var(--text); flex: 1; word-break: break-word; }
+  .age-badge {
+    display: inline-flex; align-items: center; background: var(--ems-blue-dim); color: #a9bdff;
+    font-size: 15px; font-weight: 700; padding: 3px 10px; border-radius: 8px;
+  }
+
+  .btn-group { display: flex; flex-direction: column; gap: 10px; margin-top: 6px; }
+  .btn {
+    all: unset; box-sizing: border-box; display: flex; align-items: center; justify-content: center;
+    gap: 8px; width: 100%; padding: 15px; border-radius: 12px; font-size: 15px; font-weight: 700;
+    cursor: pointer; text-align: center; letter-spacing: 0.01em;
+  }
+  .btn:active { opacity: 0.8; }
+  .btn svg { width: 17px; height: 17px; flex-shrink: 0; }
+  .btn-primary { background: var(--ems-blue); color: #fff; }
+  .btn-danger { background: transparent; color: var(--danger); border: 1px solid var(--danger); }
+  .btn-danger:active { background: var(--danger-dim); }
+
+  /* ── MODAL ── */
+  #modal-overlay {
+    display: none; position: fixed; inset: 0; background: rgba(4,6,10,0.72);
+    align-items: center; justify-content: center; padding: 24px; z-index: 50;
+  }
+  #modal-overlay.show { display: flex; }
+  #modal-box {
+    width: 100%; max-width: 380px; background: var(--panel); border: 1px solid var(--border);
+    border-top: 4px solid var(--safety); border-radius: 16px; padding: 24px 22px 20px;
+  }
+  #modal-box.danger { border-top-color: var(--danger); }
+  #modal-title { font-size: 17px; font-weight: 800; margin: 0 0 8px; }
+  #modal-message { font-size: 14px; color: var(--sub); line-height: 1.5; margin: 0 0 20px; white-space: pre-line; }
+  #modal-actions { display: flex; gap: 10px; }
+  #modal-actions button {
+    all: unset; box-sizing: border-box; flex: 1; text-align: center; cursor: pointer;
+    padding: 13px 10px; border-radius: 10px; font-size: 14px; font-weight: 700;
+  }
+  #modal-cancel { border: 1px solid var(--border); color: var(--text); }
+  #modal-cancel:active { background: var(--panel-2); }
+  #modal-confirm { background: var(--safety); color: #1a1400; }
+  #modal-confirm:active { background: #e6bc00; }
+  #modal-box.danger #modal-confirm { background: var(--danger); color: #fff; }
+  #modal-box.danger #modal-confirm:active { background: #cc2f26; }
+</style>
+</head>
+<body>
+
+<header>
+  <svg class="star" viewBox="0 0 100 100" fill="none">
+    <g stroke="#2f5fd1" stroke-width="8" stroke-linejoin="round">
+      <path d="M50 8 L58 38 L50 50 L42 38 Z" fill="#2f5fd1"/>
+      <path d="M92 50 L62 58 L50 50 L62 42 Z" fill="#2f5fd1"/>
+      <path d="M50 92 L42 62 L50 50 L58 62 Z" fill="#2f5fd1"/>
+      <path d="M8 50 L38 42 L50 50 L38 58 Z" fill="#2f5fd1"/>
+    </g>
+    <circle cx="50" cy="50" r="7" fill="#ffd100"/>
+  </svg>
+  <div class="titles">
+    <h1>EMS ID Scan</h1>
+    <p>Patient Intake</p>
+  </div>
+</header>
+
+<!-- SCAN (CAPTURE) VIEW -->
+<div id="scan-view">
+  <div class="scanner-card">
+    <div class="scanner-icon">
+      <svg viewBox="0 0 24 24" fill="none" stroke="#2f5fd1" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M3 7V5a2 2 0 012-2h2"/><path d="M17 3h2a2 2 0 012 2v2"/>
+        <path d="M21 17v2a2 2 0 01-2 2h-2"/><path d="M7 21H5a2 2 0 01-2-2v-2"/>
+        <line x1="7" y1="8" x2="7" y2="16"/><line x1="10.5" y1="8" x2="10.5" y2="16"/>
+        <line x1="14" y1="8" x2="14" y2="16"/><line x1="17.5" y1="8" x2="17.5" y2="16"/>
+      </svg>
+    </div>
+    <h2>Ready to Scan</h2>
+    <p>Scan the barcode on the back of the ID with the handheld scanner now.</p>
+
+    <div class="capture-status">
+      <span class="capture-dot"></span>
+      <span>Listening for scanner input</span>
+    </div>
+
+    <div class="capture-wrap">
+      <textarea id="captureField" rows="3" placeholder="Scanned data will appear here…" autocapitalize="off" autocorrect="off" spellcheck="false"></textarea>
+    </div>
+
+    <div class="scan-flag" id="scanFlag">Unclear or incomplete scan — try scanning again.</div>
+  </div>
+
+  <button class="pill-btn manual" id="manualEntryBtn">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+    Enter Manually
+  </button>
+</div>
+
+<!-- MANUAL ENTRY VIEW -->
+<div id="manual-view">
+  <div class="field-group">
+    <label>First Name</label>
+    <input type="text" id="m-first" autocomplete="off" autocapitalize="words">
+  </div>
+  <div class="field-group">
+    <label>Last Name</label>
+    <input type="text" id="m-last" autocomplete="off" autocapitalize="words">
+  </div>
+  <div class="field-row">
+    <div class="field-group">
+      <label>Date of Birth</label>
+      <input type="date" id="m-dob">
+    </div>
+    <div class="field-group">
+      <label>Sex</label>
+      <select id="m-sex">
+        <option value="Unknown">Unknown</option>
+        <option value="Male">Male</option>
+        <option value="Female">Female</option>
+      </select>
+    </div>
+  </div>
+  <div class="field-group">
+    <label>Street Address</label>
+    <input type="text" id="m-street" autocomplete="off">
+  </div>
+  <div class="field-row">
+    <div class="field-group">
+      <label>City</label>
+      <input type="text" id="m-city" autocomplete="off">
+    </div>
+    <div class="field-group" style="max-width:110px">
+      <label>State</label>
+      <select id="m-state"></select>
+    </div>
+    <div class="field-group" style="max-width:120px">
+      <label>Zip</label>
+      <input type="text" id="m-zip" inputmode="numeric" maxlength="10">
+    </div>
+  </div>
+  <div class="btn-group">
+    <button class="btn btn-primary" id="manualSaveBtn">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+      Save Patient Info
+    </button>
+    <button class="btn btn-danger" id="manualCancelBtn">Cancel</button>
+  </div>
+</div>
+
+<!-- RESULT VIEW -->
+<div id="result-view">
+  <div class="success-banner">
+    <div class="success-icon">
+      <svg viewBox="0 0 14 14" fill="none"><path d="M2 7l4 4 6-6" stroke="#0c1016" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </div>
+    <p id="successText">Patient info saved</p>
+  </div>
+
+  <div class="info-card">
+    <div class="card-title">Identity</div>
+    <div class="info-row"><span class="row-label">First Name</span><span class="row-value" id="firstName"></span></div>
+    <div class="info-row"><span class="row-label">Last Name</span><span class="row-value" id="lastName"></span></div>
+    <div class="info-row"><span class="row-label">Sex</span><span class="row-value" id="sex"></span></div>
+  </div>
+
+  <div class="info-card">
+    <div class="card-title">Date of Birth</div>
+    <div class="info-row"><span class="row-label">DOB</span><span class="row-value" id="dob"></span></div>
+    <div class="info-row"><span class="row-label">Age</span><span class="row-value"><span class="age-badge" id="age"></span></span></div>
+  </div>
+
+  <div class="info-card">
+    <div class="card-title">Address</div>
+    <div class="info-row"><span class="row-label">Street</span><span class="row-value" id="street"></span></div>
+    <div class="info-row"><span class="row-label">City</span><span class="row-value" id="city"></span></div>
+    <div class="info-row"><span class="row-label">State</span><span class="row-value" id="state"></span></div>
+    <div class="info-row"><span class="row-label">Zip</span><span class="row-value" id="zip"></span></div>
+  </div>
+
+  <div class="btn-group">
+    <button class="btn btn-primary" id="rescanBtn">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 102.13-9.36L1 10"/></svg>
+      New Scan / Entry
+    </button>
+    <button class="btn btn-danger" id="clearBtn">Clear Saved Info</button>
+  </div>
+</div>
+
+<div id="modal-overlay">
+  <div id="modal-box">
+    <p id="modal-title"></p>
+    <p id="modal-message"></p>
+    <div id="modal-actions">
+      <button id="modal-cancel">Cancel</button>
+      <button id="modal-confirm">Confirm</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  const STORAGE_KEY = 'emsIdScanData';
+  const STATE_CODES = ['AL','AK','AZ','AR','CA','CO','CT','DE','FL','GA','HI','ID','IL','IN','IA','KS','KY',
+    'LA','ME','MD','MA','MI','MN','MS','MO','MT','NE','NV','NH','NJ','NM','NY','NC','ND','OH','OK','OR','PA',
+    'RI','SC','SD','TN','TX','UT','VT','VA','WA','WV','WI','WY','DC','PR','VI','GU','AS','MP'];
+
+  const stateSelect = document.getElementById('m-state');
+  STATE_CODES.forEach(s => {
+    const opt = document.createElement('option');
+    opt.value = s; opt.textContent = s;
+    stateSelect.appendChild(opt);
+  });
+
+  // ---- views ----
+  const scanView = document.getElementById('scan-view');
+  const manualView = document.getElementById('manual-view');
+  const resultView = document.getElementById('result-view');
+  function showView(v) {
+    scanView.style.display = v === 'scan' ? 'block' : 'none';
+    manualView.style.display = v === 'manual' ? 'block' : 'none';
+    resultView.style.display = v === 'result' ? 'block' : 'none';
+    window.scrollTo(0, 0);
+    if (v === 'scan') focusCapture();
+  }
+
+  // ---- storage ----
+  function loadSaved() {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      return raw ? JSON.parse(raw) : null;
+    } catch (e) { return null; }
+  }
+  function saveData(data) {
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(data)); }
+    catch (e) { alert('Warning: this may not have saved. Check device storage.'); }
+  }
+  function clearSaved() {
+    try { localStorage.removeItem(STORAGE_KEY); } catch (e) {}
+  }
+
+  // ---- modal ----
+  const overlay = document.getElementById('modal-overlay');
+  const modalBox = document.getElementById('modal-box');
+  const modalTitle = document.getElementById('modal-title');
+  const modalMessage = document.getElementById('modal-message');
+  const modalCancel = document.getElementById('modal-cancel');
+  const modalConfirm = document.getElementById('modal-confirm');
+  let pendingConfirm = null;
+  function askConfirm({ title, message, danger = false, onConfirm }) {
+    modalTitle.textContent = title;
+    modalMessage.textContent = message;
+    modalBox.classList.toggle('danger', danger);
+    pendingConfirm = onConfirm;
+    overlay.classList.add('show');
+  }
+  function closeModal() { overlay.classList.remove('show'); pendingConfirm = null; }
+  modalCancel.addEventListener('click', closeModal);
+  overlay.addEventListener('click', (e) => { if (e.target === overlay) closeModal(); });
+  modalConfirm.addEventListener('click', () => {
+    const fn = pendingConfirm; closeModal(); if (fn) fn();
+  });
+
+  // ---- display ----
+  function displayData(data) {
+    document.getElementById('firstName').textContent = data.firstName;
+    document.getElementById('lastName').textContent = data.lastName;
+    document.getElementById('sex').textContent = data.sex;
+    document.getElementById('dob').textContent = data.dob;
+    document.getElementById('age').textContent = data.age;
+    document.getElementById('street').textContent = data.street;
+    document.getElementById('city').textContent = data.city;
+    document.getElementById('state').textContent = data.state;
+    document.getElementById('zip').textContent = data.zip;
+    document.getElementById('successText').textContent =
+      data.source === 'manual' ? 'Patient info saved (manual entry)' : 'ID scanned and saved';
+    showView('result');
+  }
+
+  function computeAge(dobDate) {
+    const today = new Date();
+    let age = today.getFullYear() - dobDate.getFullYear();
+    if (today < new Date(today.getFullYear(), dobDate.getMonth(), dobDate.getDate())) age--;
+    return age;
+  }
+
+  // ---- barcode parsing (AAMVA field codes) ----
+  function parseBarcode(rawData) {
+    rawData = rawData.replace(/\r/g, '\n');
+    const lines = rawData.split('\n');
+    const fields = {};
+    lines.forEach(line => {
+      line = line.trim();
+      if (/^D[A-Z]{2}/.test(line)) {
+        const code = line.substr(0, 3);
+        const value = line.substr(3).trim();
+        if (!(code in fields)) fields[code] = value;
+      }
+    });
+
+    const firstName = fields['DAC'] || '';
+    const lastName = fields['DCS'] || '';
+    const dobRaw = fields['DBB'] || '';
+    const sexCode = fields['DBC'] || '';
+    const street = fields['DAG'] || '';
+    const city = fields['DAI'] || '';
+    const state = (fields['DAJ'] || '').toUpperCase();
+    const zipRaw = fields['DAK'] || '';
+
+    let dob = '', dobDate = null;
+    if (dobRaw.length >= 8) {
+      const mm = dobRaw.substr(0, 2), dd = dobRaw.substr(2, 2), yyyy = dobRaw.substr(4, 4);
+      dobDate = new Date(`${yyyy}-${mm}-${dd}`);
+      if (!isNaN(dobDate.getTime())) dob = `${mm}/${dd}/${yyyy}`;
+    }
+
+    let zip = zipRaw;
+    if (zipRaw.length === 9) zip = zipRaw.substr(0, 5) + '-' + zipRaw.substr(5, 4);
+
+    return {
+      firstName, lastName, dob, dobDate,
+      sex: sexCode === '1' ? 'Male' : sexCode === '2' ? 'Female' : 'Unknown',
+      street, city, state, zip,
+      source: 'scan'
+    };
+  }
+
+  function validateScan(d) {
+    if (!d.firstName || !d.lastName) return false;
+    if (!d.dob || !d.dobDate || isNaN(d.dobDate.getTime())) return false;
+    if (d.dobDate > new Date()) return false;
+    const age = computeAge(d.dobDate);
+    if (age < 0 || age > 115) return false;
+    if (!d.state || STATE_CODES.indexOf(d.state) === -1) return false;
+    return true;
+  }
+
+  function finalizeAndSave(d) {
+    const record = {
+      firstName: d.firstName,
+      lastName: d.lastName,
+      dob: d.dob,
+      age: d.dobDate ? computeAge(d.dobDate) : d.age,
+      sex: d.sex,
+      street: d.street || 'Unknown',
+      city: d.city || 'Unknown',
+      state: d.state || 'Unknown',
+      zip: d.zip || 'Unknown',
+      source: d.source
+    };
+    saveData(record);
+    displayData(record);
+  }
+
+  // ---- hardware scanner capture (keyboard-wedge) ----
+  // 2D scanners act like a keyboard: they type the barcode data into whatever
+  // field is focused, very fast, usually ending with an Enter/Return keystroke.
+  // AAMVA driver's license barcodes also contain embedded line-feed characters
+  // as internal field separators, so we can't just "submit on Enter" — a
+  // premature Enter mid-transmission would cut the scan off early. Instead we
+  // debounce: after each keystroke we wait for a short pause with no further
+  // input before treating the buffer as a finished scan. Real typing is much
+  // slower than this pause, so accidental taps won't trigger it.
+  const captureField = document.getElementById('captureField');
+  const scanFlag = document.getElementById('scanFlag');
+  const MIN_SCAN_LENGTH = 25;
+  const IDLE_MS = 250;
+  let idleTimer = null;
+
+  function focusCapture() {
+    if (scanView.style.display !== 'none') {
+      captureField.focus({ preventScroll: true });
+    }
+  }
+
+  function flagBadScan() {
+    scanFlag.classList.add('show');
+    clearTimeout(scanFlag._hideTimer);
+    scanFlag._hideTimer = setTimeout(() => scanFlag.classList.remove('show'), 2500);
+  }
+
+  function processBuffer() {
+    const raw = captureField.value;
+    captureField.value = '';
+    captureField.classList.remove('active');
+    if (raw.trim().length < MIN_SCAN_LENGTH) return; // too short to be a real scan, ignore
+
+    const parsed = parseBarcode(raw);
+    if (validateScan(parsed)) {
+      finalizeAndSave(parsed);
+    } else {
+      flagBadScan();
+      focusCapture();
+    }
+  }
+
+  captureField.addEventListener('input', () => {
+    captureField.classList.add('active');
+    clearTimeout(idleTimer);
+    idleTimer = setTimeout(processBuffer, IDLE_MS);
+  });
+
+  // A trailing Enter from the scanner shouldn't insert a newline or submit
+  // anything by itself — just let the idle-timeout above handle finishing.
+  captureField.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') e.preventDefault();
+  });
+
+  // Keep the capture field focused so scanner input always lands there
+  document.addEventListener('click', () => { if (scanView.style.display !== 'none') focusCapture(); });
+  window.addEventListener('focus', () => { if (scanView.style.display !== 'none') focusCapture(); });
+  setInterval(() => {
+    if (scanView.style.display !== 'none' && document.activeElement !== captureField) focusCapture();
+  }, 1500);
+
+  document.getElementById('manualEntryBtn').addEventListener('click', () => showView('manual'));
+
+  // ---- manual entry ----
+  document.getElementById('manualCancelBtn').addEventListener('click', () => showView('scan'));
+
+  document.getElementById('manualSaveBtn').addEventListener('click', () => {
+    const first = document.getElementById('m-first').value.trim();
+    const last = document.getElementById('m-last').value.trim();
+    const dobVal = document.getElementById('m-dob').value; // yyyy-mm-dd
+    const sex = document.getElementById('m-sex').value;
+    const street = document.getElementById('m-street').value.trim();
+    const city = document.getElementById('m-city').value.trim();
+    const state = document.getElementById('m-state').value;
+    const zip = document.getElementById('m-zip').value.trim();
+
+    if (!first || !last || !dobVal) {
+      alert('First name, last name, and date of birth are required.');
+      return;
+    }
+    const [yyyy, mm, dd] = dobVal.split('-');
+    const dobDate = new Date(`${yyyy}-${mm}-${dd}`);
+    if (isNaN(dobDate.getTime()) || dobDate > new Date()) {
+      alert('Please enter a valid date of birth.');
+      return;
+    }
+
+    finalizeAndSave({
+      firstName: first, lastName: last,
+      dob: `${mm}/${dd}/${yyyy}`, dobDate,
+      sex, street, city, state, zip,
+      source: 'manual'
+    });
+  });
+
+  // ---- result view actions ----
+  document.getElementById('rescanBtn').addEventListener('click', () => {
+    askConfirm({
+      title: 'Start a new scan or entry?',
+      message: 'The currently saved patient info will be replaced once you finish a new scan or manual entry.',
+      onConfirm: () => showView('scan')
+    });
+  });
+
+  document.getElementById('clearBtn').addEventListener('click', () => {
+    askConfirm({
+      title: 'Clear saved info?',
+      message: 'This permanently clears the saved patient info from this device.\nThis cannot be undone.',
+      danger: true,
+      onConfirm: () => { clearSaved(); showView('scan'); }
+    });
+  });
+
+  // ---- init ----
+  window.addEventListener('load', () => {
+    const saved = loadSaved();
+    if (saved) {
+      displayData(saved);
+    } else {
+      showView('scan');
+    }
+  });
+</script>
+</body>
+</html>
